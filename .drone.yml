@@ -1,0 +1,50 @@
+---
+kind: pipeline
+type: kubernetes
+name: build-s3-mounter
+
+trigger:
+  branch:
+    - master
+  event:
+    include:
+      - push
+
+steps:
+  - name: Build and push
+    image: docker
+    environment:
+      REPO: quay.io
+      S3FS_VERSION: v1.86
+    settings:
+      username:
+        from_secret: QUAYIO_DOCKER_USERNAME
+      password:
+        from_secret: QUAYIO_DOCKER_PASSWORD
+    volumes:
+      - name: dockersock
+        path: /var/run
+    commands:
+    # wait for docker to start
+    - sleep 2
+    - docker pull $REPO/gravitational/s3-mounter:$S3FS_VERSION || true
+    - docker build -t $REPO/gravitational/s3-mounter:$S3FS_VERSION .
+    - docker login -u="$PLUGIN_USERNAME" -p="$PLUGIN_PASSWORD" $REPO
+    - docker push $REPO/gravitational/s3-mounter:$S3FS_VERSION
+
+services:
+  - name: Start Docker
+    image: docker:dind
+    volumes:
+      - name: dockersock
+        path: /var/run
+
+volumes:
+  - name: dockersock
+    temp: {}
+
+---
+kind: signature
+hmac: cdc0511e4dab001ebb69e426853ed9c591c3677a1e5c5af1c20fc2b997b44a37
+
+...
